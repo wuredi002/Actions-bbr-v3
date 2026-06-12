@@ -142,6 +142,7 @@ jobs:
           scripts/config --disable DEFAULT_CUBIC
           scripts/config --enable DEFAULT_BBR
           scripts/config --set-str DEFAULT_TCP_CONG bbr
+          scripts/config --enable NET_SCH_DEFAULT
           scripts/config --enable NET_SCH_FQ
           scripts/config --disable DEFAULT_FQ_CODEL
           scripts/config --disable DEFAULT_PFIFO_FAST
@@ -179,6 +180,7 @@ jobs:
           scripts/config --disable DEFAULT_CUBIC
           scripts/config --enable DEFAULT_BBR
           scripts/config --set-str DEFAULT_TCP_CONG bbr
+          scripts/config --enable NET_SCH_DEFAULT
           scripts/config --enable NET_SCH_FQ
           scripts/config --disable DEFAULT_FQ_CODEL
           scripts/config --disable DEFAULT_PFIFO_FAST
@@ -234,6 +236,10 @@ jobs:
             echo "ERROR: CONFIG_NET_SCH_FQ is not built in."
             exit 1
           fi
+          if ! grep -q '^CONFIG_NET_SCH_DEFAULT=y' .config; then
+            echo "ERROR: CONFIG_NET_SCH_DEFAULT is not enabled."
+            exit 1
+          fi
           if ! grep -q '^CONFIG_DEFAULT_FQ=y' .config; then
             echo "ERROR: CONFIG_DEFAULT_FQ is not enabled."
             exit 1
@@ -242,7 +248,7 @@ jobs:
             echo "ERROR: CONFIG_DEFAULT_NET_SCH is not fq."
             exit 1
           fi
-          grep -E 'CONFIG_(DEBUG_INFO_NONE|TCP_CONG_BBR|DEFAULT_BBR|DEFAULT_TCP_CONG|NET_SCH_FQ|DEFAULT_FQ|DEFAULT_NET_SCH)=' .config
+          grep -E 'CONFIG_(DEBUG_INFO_NONE|TCP_CONG_BBR|DEFAULT_BBR|DEFAULT_TCP_CONG|NET_SCH_DEFAULT|NET_SCH_FQ|DEFAULT_FQ|DEFAULT_NET_SCH)=' .config
 
       - name: 构建内核 Debian 包
         if: env.BUILD_NEEDED == 'true'

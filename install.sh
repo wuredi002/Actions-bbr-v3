@@ -229,35 +229,33 @@ ensure_ookla_speedtest() {
 select_china_speedtest_isp() {
     local choice=""
 
-    while true; do
-        echo -e "\033[36m请选择中国境内测速运营商：\033[0m" >&2
-        echo -e "\033[33m 1. 中国移动 / CMCC\033[0m" >&2
-        echo -e "\033[33m 2. 中国联通 / CUCC\033[0m" >&2
-        echo -e "\033[33m 3. 中国电信 / CTCC\033[0m" >&2
-        echo -n -e "\033[36m请选择 (1-3): \033[0m" >&2
-        read -r choice
+    echo -e "\033[36m请选择中国境内测速运营商：\033[0m" >&2
+    echo -e "\033[33m 1. 自动匹配三大运营商\033[0m" >&2
+    echo -e "\033[33m 2. 中国移动 / CMCC\033[0m" >&2
+    echo -e "\033[33m 3. 中国联通 / CUCC\033[0m" >&2
+    echo -e "\033[33m 4. 中国电信 / CTCC\033[0m" >&2
+    echo -n -e "\033[36m请选择 (1-4，默认 1): \033[0m" >&2
+    read -r choice
+    choice="${choice:-1}"
 
-        case "$choice" in
-            1)
-                SPEEDTEST_ISP_LABEL="中国移动"
-                SPEEDTEST_ISP_PATTERN='(Mobile|CMCC|China Mobile|中国移动|移动)'
-                return 0
-                ;;
-            2)
-                SPEEDTEST_ISP_LABEL="中国联通"
-                SPEEDTEST_ISP_PATTERN='(Unicom|CUCC|China Unicom|中国联通|联通)'
-                return 0
-                ;;
-            3)
-                SPEEDTEST_ISP_LABEL="中国电信"
-                SPEEDTEST_ISP_PATTERN='(Telecom|CTCC|China Telecom|中国电信|电信)'
-                return 0
-                ;;
-            *)
-                echo -e "\033[31m请输入 1、2 或 3 选择测速运营商。\033[0m" >&2
-                ;;
-        esac
-    done
+    case "$choice" in
+        2)
+            SPEEDTEST_ISP_LABEL="中国移动"
+            SPEEDTEST_ISP_PATTERN='(Mobile|CMCC|China Mobile|中国移动|移动)'
+            ;;
+        3)
+            SPEEDTEST_ISP_LABEL="中国联通"
+            SPEEDTEST_ISP_PATTERN='(Unicom|CUCC|China Unicom|中国联通|联通)'
+            ;;
+        4)
+            SPEEDTEST_ISP_LABEL="中国电信"
+            SPEEDTEST_ISP_PATTERN='(Telecom|CTCC|China Telecom|中国电信|电信)'
+            ;;
+        *)
+            SPEEDTEST_ISP_LABEL="三大运营商自动匹配"
+            SPEEDTEST_ISP_PATTERN='(Mobile|CMCC|China Mobile|中国移动|移动|Unicom|CUCC|China Unicom|中国联通|联通|Telecom|CTCC|China Telecom|中国电信|电信)'
+            ;;
+    esac
 }
 
 # 函数：从 Ookla server list 中筛选中国境内节点

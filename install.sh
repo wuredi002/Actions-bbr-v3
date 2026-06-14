@@ -45,6 +45,7 @@ SECURITY_MODPROBE_CONF="/etc/modprobe.d/99-joeyblog-security.conf"
 # 可选：提升 GitHub API 限额（支持 GITHUB_TOKEN / GH_TOKEN）
 GITHUB_API_TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 SPEEDTEST_BIN="speedtest"
+OOKLA_SPEEDTEST_VERSION="1.2.0"
 
 gh_api_get() {
     local url="$1"
@@ -242,31 +243,64 @@ calculate_smart_buffer_mb() {
     echo "$buffer_mb"
 }
 
-# 函数：确保 Ookla 官方 speedtest 可用
-ensure_ookla_speedtest() {
-    if command -v speedtest > /dev/null 2>&1 \
-        && speedtest --version 2>&1 | grep -q "Speedtest by Ookla"; then
-        SPEEDTEST_BIN=$(command -v speedtest)
-        return 0
-    fi
-
+# 函数：获取 Ookla 官方 speedtest 下载地址
+get_ookla_speedtest_download_url() {
     local cpu_arch
-    local download_url
     cpu_arch=$(uname -m)
     case "$cpu_arch" in
         x86_64)
-            download_url="https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-x86_64.tgz"
+            echo "https://install.speedtest.net/app/cli/ookla-speedtest-${OOKLA_SPEEDTEST_VERSION}-linux-x86_64.tgz"
             ;;
         aarch64)
-            download_url="https://install.speedtest.net/app/cli/ookla-speedtest-1.2.0-linux-aarch64.tgz"
+            echo "https://install.speedtest.net/app/cli/ookla-speedtest-${OOKLA_SPEEDTEST_VERSION}-linux-aarch64.tgz"
             ;;
         *)
-            echo -e "\033[33m⚠ 当前架构 $cpu_arch 暂无内置 Ookla speedtest 下载地址。\033[0m"
+            echo -e "\033[33m⚠ 当前架构 $cpu_arch 暂无内置 Ookla speedtest 下载地址。\033[0m" >&2
             return 1
             ;;
     esac
+}
 
-    echo -e "\033[33m未检测到 Ookla speedtest，正在安装...\033[0m"
+# 函数：检测当前 speedtest 是否为 Ookla 官方 CLI
+is_ookla_speedtest() {
+    local bin_path="${1:-}"
+    [[ -n "$bin_path" ]] || return 1
+    "$bin_path" --version 2>&1 | grep -q "Speedtest by Ookla ${OOKLA_SPEEDTEST_VERSION}"
+}
+
+# 函数：移除 speedtest-cli，避免误用 Python 版导致输出解析失败
+remove_speedtest_cli() {
+    local speedtest_path=""
+    local version_output=""
+
+    speedtest_path=$(command -v speedtest 2>/dev/null || true)
+    if [[ -n "$speedtest_path" ]] && ! is_ookla_speedtest "$speedtest_path"; then
+        version_output=$($speedtest_path --version 2>&1 || true)
+        if echo "$version_output" | grep -qi "speedtest-cli\|python" || dpkg -S "$speedtest_path" 2>/dev/null | grep -q '^speedtest-cli:'; then
+            echo -e "\033[33m检测到非 Ookla 官方 speedtest，正在移除 speedtest-cli...\033[0m"
+            sudo apt-get remove --purge -y speedtest-cli > /dev/null 2>&1 || true
+        fi
+
+        if [[ "$speedtest_path" != "/usr/local/bin/speedtest" ]]; then
+            sudo rm -f "$speedtest_path" 2>/dev/null || true
+        fi
+    fi
+
+    if dpkg -l speedtest-cli 2>/dev/null | awk 'NR>5 && $1 ~ /^ii/ {found=1} END {exit !found}'; then
+        echo -e "\033[33m检测到 speedtest-cli 软件包，正在移除...\033[0m"
+        sudo apt-get remove --purge -y speedtest-cli > /dev/null 2>&1 || true
+    fi
+
+    hash -r 2>/dev/null || true
+}
+
+# 函数：安装指定版本 Ookla 官方 speedtest
+install_ookla_speedtest() {
+    local download_url
+
+    download_url=$(get_ookla_speedtest_download_url) || return 1
+
+    echo -e "\033[33m正在安装 Ookla speedtest ${OOKLA_SPEEDTEST_VERSION}...\033[0m"
     (
         cd /tmp || exit 1
         rm -rf speedtest speedtest.tgz speedtest.5 speedtest.md
@@ -278,20 +312,41 @@ ensure_ookla_speedtest() {
     ) || return 1
 
     SPEEDTEST_BIN="/usr/local/bin/speedtest"
+    hash -r 2>/dev/null || true
+
+    if ! is_ookla_speedtest "$SPEEDTEST_BIN"; then
+        echo -e "\033[31mOokla speedtest 安装后校验失败。\033[0m"
+        return 1
+    fi
 }
 
-# 函数：运行 Ookla Speedtest 并解析 Download/Upload，不展示测速节点延迟
-run_speedtest_measurement() {
-    SPEEDTEST_DOWNLOAD=""
-    SPEEDTEST_UPLOAD=""
+# 函数：确保 Ookla 官方 speedtest 可用
+ensure_ookla_speedtest() {
+    remove_speedtest_cli
 
-    ensure_ookla_speedtest || return 1
+    if command -v speedtest > /dev/null 2>&1; then
+        SPEEDTEST_BIN=$(command -v speedtest)
+        if is_ookla_speedtest "$SPEEDTEST_BIN"; then
+            return 0
+        fi
+    fi
 
-    echo -e "\033[36m正在运行 Ookla Speedtest 测速，请稍候...\033[0m"
-    echo -e "\033[33m测速只用于估算带宽；测速节点延迟不会显示，也不会用于 RTT 计算。\033[0m"
+    if command -v speedtest > /dev/null 2>&1; then
+        SPEEDTEST_BIN=$(command -v speedtest)
+        if is_ookla_speedtest "$SPEEDTEST_BIN"; then
+            return 0
+        fi
+    fi
+
+    install_ookla_speedtest
+}
+
+# 函数：执行一次 Speedtest 测速并解析带宽
+run_speedtest_once() {
     local servers_list
     local speedtest_output=""
     local attempt=0
+
     servers_list=$("$SPEEDTEST_BIN" --accept-license --accept-gdpr --servers 2>/dev/null | sed -nE 's/^[[:space:]]*([0-9]+).*/\1/p' | head -n 10)
     if [[ -z "$servers_list" ]]; then
         servers_list="auto"
@@ -313,12 +368,32 @@ run_speedtest_measurement() {
         SPEEDTEST_UPLOAD=$(echo "$speedtest_output" | sed -nE 's/.*[Uu]pload:[[:space:]]*([0-9]+(\.[0-9]+)?).*/\1/p' | head -n1)
 
         if is_positive_number "$SPEEDTEST_UPLOAD" && ! echo "$speedtest_output" | grep -qi "FAILED\|error"; then
-            break
+            return 0
         fi
 
         SPEEDTEST_DOWNLOAD=""
         SPEEDTEST_UPLOAD=""
     done
+
+    return 1
+}
+
+# 函数：运行 Ookla Speedtest 并解析 Download/Upload，不展示测速节点延迟
+run_speedtest_measurement() {
+    SPEEDTEST_DOWNLOAD=""
+    SPEEDTEST_UPLOAD=""
+
+    ensure_ookla_speedtest || return 1
+
+    echo -e "\033[36m正在运行 Ookla Speedtest 测速，请稍候...\033[0m"
+    echo -e "\033[33m测速只用于估算带宽；测速节点延迟不会显示，也不会用于 RTT 计算。\033[0m"
+
+    if ! run_speedtest_once; then
+        echo -e "\033[33m⚠ Speedtest 输出解析失败，正在清理 speedtest-cli 并重装 Ookla 官方版本后重试...\033[0m"
+        remove_speedtest_cli
+        install_ookla_speedtest || return 1
+        run_speedtest_once || true
+    fi
 
     if is_positive_number "$SPEEDTEST_UPLOAD"; then
         echo -e "\033[36m  Download: \033[1;32m${SPEEDTEST_DOWNLOAD:-0} Mbit/s\033[0m"

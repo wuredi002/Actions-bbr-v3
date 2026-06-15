@@ -901,7 +901,7 @@ install_latest_version() {
     assert_supported_kernel_install_system || return 1
 
     echo -e "\033[36m正在从 GitHub 获取最新版本信息...\033[0m"
-    BASE_URL="https://api.github.com/repos/byJoey/Actions-bbr-v3/releases"
+    BASE_URL="https://api.github.com/repos/wuredi002/Actions-bbr-v3/releases"
     RELEASE_DATA=$(gh_api_get "$BASE_URL")
     if [[ -z "$RELEASE_DATA" ]]; then
         echo -e "\033[31m从 GitHub 获取版本信息失败。请检查网络连接或 API 状态。\033[0m"
@@ -953,7 +953,7 @@ install_latest_version() {
 install_specific_version() {
     assert_supported_kernel_install_system || return 1
 
-    BASE_URL="https://api.github.com/repos/byJoey/Actions-bbr-v3/releases"
+    BASE_URL="https://api.github.com/repos/wuredi002/Actions-bbr-v3/releases"
     RELEASE_DATA=$(gh_api_get "$BASE_URL")
     if [[ -z "$RELEASE_DATA" ]]; then
         echo -e "\033[31m从 GitHub 获取版本信息失败。请检查网络连接或 API 状态。\033[0m"
@@ -1021,7 +1021,7 @@ print_separator
 echo -e "\033[36m当前 TCP 拥塞控制算法：\033[0m\033[1;32m$CURRENT_ALGO\033[0m"
 echo -e "\033[36m当前队列管理算法：    \033[0m\033[1;32m$CURRENT_QDISC\033[0m"
 print_separator
-echo -e "\033[1;33m作者：Joey  |  博客：https://joeyblog.net  |  反馈群组：https://t.me/+ft-zI76oovgwNmRh\033[0m"
+echo -e "\033[1;33m作者：wuredi002\033[0m"
 print_separator
 
 echo -e "\033[1;33m╭( ･ㅂ･)و ✧ 你可以选择以下操作哦：\033[0m"
@@ -1127,7 +1127,7 @@ case "$ACTION" in
             update_bootloader
             echo -e "\033[1;32m内核包已卸载。请记得重启系统。\033[0m"
         else
-            echo -e "\033[33m未找到由本脚本安装的 'joeyblog' 内核包。\033[0m"
+            echo -e "\033[33m未找到由本脚本安装的 'wuredi002' 内核包。\033[0m"
         fi
         ;;
     10)
